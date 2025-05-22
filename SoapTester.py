@@ -481,7 +481,7 @@ class SoapTester(QMainWindow):
         selected_sign_name = self.element_sign_combo.currentText()
         selected_append_name = self.element_append_combo.currentText()
 
-        if (selected_sign_name == "Select element to sign" or 
+        if (selected_sign_name == "Select element to sign" or
                 selected_append_name == "Select element to append signature"):
             QMessageBox.warning(
                 self, "Warning",
