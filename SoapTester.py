@@ -188,7 +188,7 @@ class SoapTester(QMainWindow):
 
             envelope = ET.Element('{http://schemas.xmlsoap.org/soap/envelope/}Envelope')
             envelope.set('xmlns:soapenv', 'http://schemas.xmlsoap.org/soap/envelope/')
-            header = ET.SubElement(envelope, '{http://schemas.xmlsoap.org/soap/envelope/}Header')
+            # header = ET.SubElement(envelope, '{http://schemas.xmlsoap.org/soap/envelope/}Header')
             body = ET.SubElement(envelope, '{http://schemas.xmlsoap.org/soap/envelope/}Body')
 
             nsmap = input_message.body.qname.namespace
