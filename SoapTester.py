@@ -5,11 +5,10 @@ from datetime import datetime
 
 import requests
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import pkcs12
 from lxml import etree
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -319,7 +318,7 @@ class SoapTester(QMainWindow):
         try:
             service = list(self.client.wsdl.services.values())[0]
             port = list(service.ports.values())[0]
-            operation_name = list(port.binding._operations.keys())[0]
+            # operation_name = list(port.binding._operations.keys())[0]
             input_message = list(port.binding._operations.values())[0].input
 
             if not input_message or not input_message.body:
