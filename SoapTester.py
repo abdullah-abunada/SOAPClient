@@ -105,7 +105,8 @@ class SoapTester(QMainWindow):
         send_button.clicked.connect(self.send_request)
         layout.addWidget(send_button)
 
-    def strip_namespace_prefixes(self, elem):
+    @staticmethod
+    def strip_namespace_prefixes(elem):
         """Remove namespace prefixes from element tags and attributes recursively.
 
         Args:
@@ -126,7 +127,7 @@ class SoapTester(QMainWindow):
         elem.attrib.update(new_attrib)
 
         for child in elem:
-            self.strip_namespace_prefixes(child)
+            SoapTester.strip_namespace_prefixes(child)
 
         return elem
 
@@ -141,7 +142,7 @@ class SoapTester(QMainWindow):
         """
         parser = etree.XMLParser(remove_blank_text=True)
         root = etree.fromstring(ET.tostring(element, encoding='utf-8'), parser=parser)
-        cleaned_root = self.strip_namespace_prefixes(root)
+        cleaned_root = SoapTester.strip_namespace_prefixes(root)
         canonicalized_bytes = etree.tostring(
             cleaned_root, method="c14n", exclusive=True, with_comments=False
         )
@@ -205,17 +206,17 @@ class SoapTester(QMainWindow):
                     if isinstance(element.type, zeep.xsd.ComplexType):
                         build_elements(child_elem, element.type, depth + 1)
                     else:
-                        child_elem.text = self.get_default_value(element.type, name)
+                        child_elem.text = SoapTester.get_default_value(element.type, name)
 
             build_elements(operation_elem, element_def)
 
-            formatted = self.format_xml(ET.tostring(envelope, encoding='unicode'))
+            formatted = SoapTester.format_xml(ET.tostring(envelope, encoding='unicode'))
             self.request_edit.setText(formatted)
 
             self.populate_element_combos()
 
         except Exception as e:
-            fallback_xml = self.format_xml(
+            fallback_xml = SoapTester.format_xml(
                 '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">'
                 '<soapenv:Header/><soapenv:Body><FallbackOperation/></soapenv:Body>'
                 '</soapenv:Envelope>'
@@ -255,11 +256,12 @@ class SoapTester(QMainWindow):
                     )
                     kwargs[name] = nested_instance
                 else:
-                    kwargs[name] = self.get_default_value(elem_type, name)
+                    kwargs[name] = SoapTester.get_default_value(elem_type, name)
             return type_obj(**kwargs)
-        return self.get_default_value(xsd_type, type_obj.__class__.__name__)
+        return SoapTester.get_default_value(xsd_type, type_obj.__class__.__name__)
 
-    def get_default_value(self, xsd_type, name):
+    @staticmethod
+    def get_default_value(xsd_type, name):
         """Generate a default value for a given XSD type.
 
         Args:
@@ -286,7 +288,8 @@ class SoapTester(QMainWindow):
             return ''
         return None
 
-    def format_xml(self, xml_string):
+    @staticmethod
+    def format_xml(xml_string):
         """Format XML string for display with proper indentation.
 
         Args:
@@ -456,14 +459,13 @@ class SoapTester(QMainWindow):
             append_target = append_targets[0]
 
             content = self.canonicalize_element(sign_target)
-            print(content)
             signature = self.signing_private_key.sign(
                 content, padding.PKCS1v15(), hashes.SHA256()
             )
             signature_b64 = base64.b64encode(signature).decode()
             append_target.text = signature_b64
 
-            formatted_xml = self.format_xml(ET.tostring(root, encoding='unicode'))
+            formatted_xml = SoapTester.format_xml(ET.tostring(root, encoding='unicode'))
             self.request_edit.setText(formatted_xml)
 
         except Exception as e:
@@ -511,15 +513,13 @@ class SoapTester(QMainWindow):
             signature_b64 = append_target.text
             if not signature_b64:
                 QMessageBox.warning(self, "Warning", "No signature found in the response.")
-                return
-
-            signature = base64.b64decode(signature_b64)
-            content = self.canonicalize_element(sign_target)
-
-            self.verifying_certificate.public_key().verify(
-                signature, content, padding.PKCS1v15(), hashes.SHA256()
-            )
-            QMessageBox.information(self, "Signature Verified", "The response signature is valid.")
+            else:
+                signature = base64.b64decode(signature_b64)
+                content = self.canonicalize_element(sign_target)
+                self.verifying_certificate.public_key().verify(
+                    signature, content, padding.PKCS1v15(), hashes.SHA256()
+                )
+                QMessageBox.information(self, "Signature Verified", "The response signature is valid.")
         except Exception as e:
             QMessageBox.critical(
                 self, "Signature Verification Failed",
@@ -582,14 +582,15 @@ class SoapTester(QMainWindow):
 
             response_dict = zeep.helpers.serialize_object(response, target_cls=dict)
             response_xml = self.dict_to_xml(response_dict, operation_name + 'Response')
-            formatted_response = self.format_xml(response_xml)
+            formatted_response = SoapTester.format_xml(response_xml)
             self.response_edit.setText(formatted_response)
             self.verify_response_signature(response_xml=formatted_response)
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to send request: {str(e)}")
 
-    def dict_to_xml(self, data, root_tag):
+    @staticmethod
+    def dict_to_xml(data, root_tag):
         """Convert a dictionary to an XML string.
 
         Args:
