@@ -554,7 +554,7 @@ class SoapTester(QMainWindow):
                             return
 
             operation_name = list(self.client.service._operations.keys())[0]
-            #operation = list(self.client.service._operations.values())[0]
+            # operation = list(self.client.service._operations.values())[0]
 
             body = root.find('{http://schemas.xmlsoap.org/soap/envelope/}Body')
             if body is None:
