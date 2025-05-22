@@ -1,0 +1,81 @@
+name: SoapTester CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        python-version: [ '3.8', '3.9', '3.10', '3.11' ]
+
+    steps:
+    # Checking out the repository code
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Setting up Python environment
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    # Installing dependencies
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 zeep cryptography requests lxml pytest flake8 pytest-cov
+
+    # Running linting with flake8
+    - name: Lint with flake8
+      run: |
+        flake8 . --max-line-length=120 --exclude=venv,tests
+
+    # Running unit tests with pytest
+    - name: Run tests with pytest
+      run: |
+        pytest tests/ --cov=./ --cov-report=xml
+
+    # Uploading coverage report
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+    # Checking out the repository code
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # Setting up Python
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    # Installing dependencies
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 zeep cryptography requests lxml pyinstaller
+
+    # Building standalone executable
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --name SoapTester --onefile SoapTester.py
+
+    # Uploading build artifact
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SoapTester-${{ runner.os }}
+        path: dist/SoapTester
