@@ -156,7 +156,9 @@ class SoapTester(QMainWindow):
         wsdl_url = self.wsdl_url_input.text().strip()
         if not wsdl_url:
             wsdl_file, _ = QFileDialog.getOpenFileName(
-                self, "Select WSDL File", "", "WSDL Files (*.wsdl *.xml)"
+                self
+
+, "Select WSDL File", "", "WSDL Files (*.wsdl *.xml)"
             )
             if wsdl_file:
                 wsdl_url = f"file://{wsdl_file}"
@@ -319,9 +321,9 @@ class SoapTester(QMainWindow):
         try:
             service = list(self.client.wsdl.services.values())[0]
             port = list(service.ports.values())[0]
-            operation_name, operation = list(port.binding._operations.items())[0]
+            operation_name = list(port.binding._operations.keys())[0]
+            input_message = list(port.binding._operations.values())[0].input
 
-            input_message = operation.input
             if not input_message or not input_message.body:
                 return
 
