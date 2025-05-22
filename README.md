@@ -36,7 +36,7 @@ SoapTester is a Python-based desktop application for testing SOAP web services. 
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/<your-username>/SoapTester.git
+   git clone https://github.com/abdullah-abunada/SOAPClient.git
    cd SoapTester
    ```
 2. (Optional) Create a virtual environment:
