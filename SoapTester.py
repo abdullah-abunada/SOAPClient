@@ -618,7 +618,8 @@ class SoapTester(QMainWindow):
 
 
 if __name__ == '__main__':
-    app = QApplication([])
+    import sys
+    app = QApplication(sys.argv)
     window = SoapTester()
     window.show()
     sys.exit(app.exec())
