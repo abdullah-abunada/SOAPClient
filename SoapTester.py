@@ -327,24 +327,32 @@ class SoapTester(QMainWindow):
             parser = ET.XMLParser(strip_cdata=False) # Do not recover, let it fail on bad XML
             root = ET.fromstring(cleaned_xml_for_et_no_decl.encode('utf-8'), parser=parser)
 
-            parent_map = {c: p for p in root.iter() for c in p}
-            candidate_to_remove = None
+            def _recursively_remove_empty_tags(element):
+                """
+                Recursively removes empty tags.
+                Returns True if 'element' itself became empty and should be removed by its parent.
+                """
+                child_indices_to_remove = []
+                for i, child in enumerate(list(element)): # Iterate over a copy
+                    if _recursively_remove_empty_tags(child):
+                        child_indices_to_remove.append(i)
 
-            # Iterate through all elements in document order (which is depth-first)
-            for element in root.iter():
-                # Check if element is "empty": no children and no significant text
-                is_empty = (len(list(element)) == 0 and
-                              (element.text is None or not element.text.strip()))
-                if is_empty:
-                    # This element is empty. Since we iterate in document order,
-                    # the last one assigned to candidate_to_remove will be the "last" empty tag.
-                    candidate_to_remove = element
+                for i in sorted(child_indices_to_remove, reverse=True):
+                    element.remove(element[i])
 
-            # If an empty tag was found and it's not the root element, remove it
-            if candidate_to_remove is not None and candidate_to_remove is not root:
-                parent = parent_map.get(candidate_to_remove)
-                if parent is not None:
-                    parent.remove(candidate_to_remove)
+                # Check if the current element itself is empty
+                # "Empty" means: no children AND (no text OR text is only whitespace)
+                # Attributes do not prevent a tag from being considered empty for removal.
+                if not list(element) and (not element.text or not element.text.strip()):
+                    return True # Mark this element for removal by its parent
+                
+                return False # Element is not empty or should not be removed
+
+            # Iterate over a copy of root's children to allow modification
+            # Call _recursively_remove_empty_tags for its side effect of modifying child_of_root in-place.
+            # Do NOT remove child_of_root from root based on the return value here.
+            for child_of_root in list(root): # Iterate over a copy
+                _recursively_remove_empty_tags(child_of_root)
             
             # Serialize back to string using 'unicode' to get a string directly
             modified_xml_string = ET.tostring(root, encoding='unicode', method='xml')
