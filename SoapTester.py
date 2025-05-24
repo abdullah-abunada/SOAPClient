@@ -360,7 +360,7 @@ class SoapTester(QMainWindow):
         try:
             service = list(self.client.wsdl.services.values())[0]
             port = list(service.ports.values())[0]
-            operation_name = list(port.binding._operations.keys())[0]
+            # operation_name = list(port.binding._operations.keys())[0]
             input_message = list(port.binding._operations.values())[0].input
 
             if not input_message or not input_message.body:
@@ -469,7 +469,8 @@ class SoapTester(QMainWindow):
         selected_sign_name = self.element_sign_combo.currentText()
         selected_append_name = self.element_append_combo.currentText()
 
-        if selected_sign_name == "Select element to sign" or selected_append_name == "Select element to append signature":
+        if (selected_sign_name == "Select element to sign" or
+                selected_append_name == "Select element to append signature"):
             QMessageBox.warning(
                 self, "Warning",
                 "Please select elements to sign and append the signature."
@@ -521,7 +522,8 @@ class SoapTester(QMainWindow):
         selected_sign_name = self.element_sign_combo.currentText()
         selected_append_name = self.element_append_combo.currentText()
 
-        if selected_sign_name == "Select element to sign" or selected_append_name == "Select element to append signature":
+        if (selected_sign_name == "Select element to sign" or
+                selected_append_name == "Select element to append signature"):
             QMessageBox.warning(
                 self, "Warning",
                 "Please select valid elements for verification."

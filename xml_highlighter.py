@@ -1,15 +1,16 @@
 import re
 from PyQt6.QtGui import QSyntaxHighlighter, QColor, QTextCharFormat, QFont, QPalette
-from PyQt6.QtWidgets import QApplication # To get the global application palette
+from PyQt6.QtWidgets import QApplication  # To get the global application palette
 
 class XmlHighlighter(QSyntaxHighlighter):
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
         # Determine if dark mode is active
         # Ensure QApplication instance exists, especially if highlighter can be created before app exec.
         app_instance = QApplication.instance()
-        if app_instance is None: # Fallback if no app instance (e.g. testing outside app)
+        if app_instance is None:  # Fallback if no app instance (e.g. testing outside app)
             is_dark_mode = False 
         else:
             current_palette = app_instance.palette()
@@ -54,7 +55,7 @@ class XmlHighlighter(QSyntaxHighlighter):
         comment_char_format.setForeground(comment_color)
         comment_char_format.setFontItalic(True)
         self.formats["comment"] = comment_char_format
-        
+
         # CDATA Format
         cdata_char_format = QTextCharFormat()
         cdata_char_format.setForeground(cdata_color)
@@ -70,10 +71,10 @@ class XmlHighlighter(QSyntaxHighlighter):
         self.rules.append((re.compile(r'\s+([a-zA-Z0-9_:-]+)\s*='), self.formats["attribute"]))
         # Original regex: r'=\s*("[^"]*"|\'[^\']*\')' - for attribute values
         self.rules.append((re.compile(r'=\s*("[^"]*"|\'[^\']*\')'), self.formats["value"]))
-        
+
         # Comment rule (special handling in highlightBlock)
         self.comment_rule_regex = re.compile(r"<!--.*?-->")
-        
+
         # CDATA rule (special handling in highlightBlock)
         self.cdata_rule_regex = re.compile(r"<!\[CDATA\[.*?]]>")
 
@@ -102,20 +103,22 @@ class XmlHighlighter(QSyntaxHighlighter):
                         is_inside_cdata = True
                         break
                 if is_inside_cdata:
-                    continue # Skip formatting if inside CDATA
+                    continue  # Skip formatting if inside CDATA
 
                 # Check if the current match is inside a Comment block
-                # This is a simplified check. A more robust way involves checking previousBlockState for multi-line comments.
+                # This is a simplified check. A more robust way involves checking previousBlockState
+                # for multi-line comments.
                 # For single-line comments, if the comment was already formatted, we might not need this,
                 # but good for safety to avoid re-applying different formats to comment content.
-                # However, the current comment regex is greedy (.*?), so it should consume content that might look like tags.
-                
+                # However, the current comment regex is greedy (.*?), so it should consume content
+                # that might look like tags.
+
                 # Determine which part of the match to format
                 # Based on original logic:
                 # - For tags <...> and attribute names: format group 1
                 # - For attribute values ="...": format group 0 (the whole match including quotes)
                 # - For closing brackets > />: format group 0 (the whole match)
-                
+
                 try:
                     if pattern.pattern == r"<[/?!]?\s*([a-zA-Z0-9_:]+)" or \
                        pattern.pattern == r'\s+([a-zA-Z0-9_:-]+)\s*=':
@@ -130,7 +133,8 @@ class XmlHighlighter(QSyntaxHighlighter):
                         self.setFormat(start, length, char_format)
                     elif pattern.pattern == r"\s*([/?]?)>":
                          # This rule targets the whole match (closing brackets)
-                        start = match.start(0) # Or match.start(1) if only the bracket itself, but original was likely whole match
+                         # Or match.start(1) if only the bracket itself, but original was likely whole match
+                        start = match.start(0)
                         length = match.end(0) - start
                         self.setFormat(start, length, char_format)
                     else:
