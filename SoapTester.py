@@ -192,7 +192,7 @@ class SoapTester(QMainWindow):
 
             envelope = ET.Element('{http://schemas.xmlsoap.org/soap/envelope/}Envelope')
             envelope.set('xmlns:soapenv', 'http://schemas.xmlsoap.org/soap/envelope/')
-            # header = ET.SubElement(envelope, '{http://schemas.xmlsoap.org/soap/envelope/}Header')
+            ET.SubElement(envelope, '{http://schemas.xmlsoap.org/soap/envelope/}Header')
             body = ET.SubElement(envelope, '{http://schemas.xmlsoap.org/soap/envelope/}Body')
 
             nsmap = input_message.body.qname.namespace
@@ -293,95 +293,58 @@ class SoapTester(QMainWindow):
 
     @staticmethod
     def format_xml(xml_string):
-        """Format XML string for display with proper indentation and remove the last empty tag.
+        """Format XML string, preserving specified empty tags like BillsRec.
 
         Args:
             xml_string: The raw XML string to format.
 
         Returns:
-            str: The formatted XML string.
+            str: The formatted XML string with empty child tags removed except preserved tags.
         """
         try:
-            # Initial formatting with minidom
+            # Initial parsing with minidom for basic formatting
             parsed = minidom.parseString(xml_string)
-            pretty_xml_string = parsed.toprettyxml(indent="  ")
-            # Apply initial regex cleanups (consistent with original behavior)
-            cleaned_xml = re.sub(r'\n\s*\n+', '\n', pretty_xml_string)
+            pretty_xml = parsed.toprettyxml(indent="  ")
+            cleaned_xml = re.sub(r'\n\s*\n+', '\n', pretty_xml)
             cleaned_xml = '\n'.join(line.rstrip() for line in cleaned_xml.splitlines() if line.strip())
-            # The original version had a regex to convert <tag/> to <tag></tag>.
-            # This might be important for the "empty" check later if minidom produces self-closing tags.
-            # However, ET.fromstring might handle self-closing tags fine.
-            # For now, let's keep it to ensure the input to ET is consistent with previous expectations.
-            # cleaned_xml = re.sub(r'<([a-zA-Z0-9_:.-]+)([^>]*)\s*/>', r'<\1\2></\1>', cleaned_xml)
-
         except Exception as e:
-            # If minidom parsing fails, return original string as a fallback
             print(f"Error in initial minidom parsing: {e}")
             return xml_string
 
         try:
-            # Parse into ElementTree for structural modification
-            # Remove XML declaration if present, as ET.fromstring doesn't like it.
-            cleaned_xml_for_et_no_decl = re.sub(r'^<\?xml.*?\?>', '', cleaned_xml, flags=re.DOTALL).strip()
-            
-            parser = ET.XMLParser(strip_cdata=False) # Do not recover, let it fail on bad XML
-            root = ET.fromstring(cleaned_xml_for_et_no_decl.encode('utf-8'), parser=parser)
+            # Remove XML declaration for ElementTree parsing
+            cleaned_xml = re.sub(r'^<\?xml.*?\?>', '', cleaned_xml, flags=re.DOTALL).strip()
+            root = ET.fromstring(cleaned_xml.encode('utf-8'))
 
-            def _recursively_remove_empty_tags(element):
-                """
-                Recursively removes empty tags.
-                Returns True if 'element' itself became empty and should be removed by its parent.
-                """
-                child_indices_to_remove = []
-                for i, child in enumerate(list(element)): # Iterate over a copy
-                    if _recursively_remove_empty_tags(child):
-                        child_indices_to_remove.append(i)
+            def remove_empty_child_tags(element):
+                """Recursively remove empty child tags, preserving BillsRec."""
+                children_to_remove = []
+                for child in list(element):
+                    if remove_empty_child_tags(child):
+                        children_to_remove.append(child)
 
-                for i in sorted(child_indices_to_remove, reverse=True):
-                    element.remove(element[i])
+                for child in children_to_remove:
+                    element.remove(child)
 
-                # Check if the current element itself is empty
-                # "Empty" means: no children AND (no text OR text is only whitespace)
-                # Attributes do not prevent a tag from being considered empty for removal.
-                if not list(element) and (not element.text or not element.text.strip()):
-                    return True # Mark this element for removal by its parent
-                
-                return False # Element is not empty or should not be removed
+                # Check if the current element is empty
+                is_empty = not list(element) and (not element.text or not element.text.strip())
+                # Preserve BillsRec even if empty
+                return is_empty and element.tag != 'BillsRec'
 
-            # Iterate over a copy of root's children to allow modification
-            # Call _recursively_remove_empty_tags for its side effect of modifying child_of_root in-place.
-            # Do NOT remove child_of_root from root based on the return value here.
-            for child_of_root in list(root): # Iterate over a copy
-                _recursively_remove_empty_tags(child_of_root)
-            
-            # Serialize back to string using 'unicode' to get a string directly
-            modified_xml_string = ET.tostring(root, encoding='unicode', method='xml')
+            remove_empty_child_tags(root)
 
-            # Re-format with minidom for consistent pretty output
-            final_parsed = minidom.parseString(modified_xml_string)
+            # Serialize to string
+            modified_xml = ET.tostring(root, encoding='unicode', method='xml')
+
+            # Reformat with minidom for consistent indentation
+            final_parsed = minidom.parseString(modified_xml)
             final_pretty_xml = final_parsed.toprettyxml(indent="  ")
-            
-            # Apply the same newline cleaning as before
             cleaned_final_xml = re.sub(r'\n\s*\n+', '\n', final_pretty_xml)
             cleaned_final_xml = '\n'.join(line.rstrip() for line in cleaned_final_xml.splitlines() if line.strip())
-            
-            # The original code had a regex to convert <tag ... /> to <tag ...></tag>.
-            # minidom.toprettyxml might already handle this or produce <tag/> for elements without children.
-            # If an element was specifically made empty by removing its child, ET.tostring and then
-            # minidom should correctly represent it as <tag></tag> or <tag/>.
-            # Let's omit the forceful expansion of self-closing tags here unless testing shows it's necessary
-            # for consistency with other parts of the application or for the definition of "empty".
-            # The primary goal is pretty printing of the (potentially) modified ET structure.
 
             return cleaned_final_xml
-
-        except ET.ParseError as e:
-            print(f"Error parsing XML with ElementTree for empty tag removal: {e}")
-            # Fallback to the minidom-prettified version if ET processing fails
-            return cleaned_xml 
         except Exception as e:
-            print(f"Generic error during XML processing for empty tag removal: {e}")
-            # Fallback to the minidom-prettified version as a last resort
+            print(f"Error during XML processing: {e}")
             return cleaned_xml
 
     def populate_element_combos(self):
@@ -397,7 +360,7 @@ class SoapTester(QMainWindow):
         try:
             service = list(self.client.wsdl.services.values())[0]
             port = list(service.ports.values())[0]
-            # operation_name = list(port.binding._operations.keys())[0]
+            operation_name = list(port.binding._operations.keys())[0]
             input_message = list(port.binding._operations.values())[0].input
 
             if not input_message or not input_message.body:
@@ -506,8 +469,7 @@ class SoapTester(QMainWindow):
         selected_sign_name = self.element_sign_combo.currentText()
         selected_append_name = self.element_append_combo.currentText()
 
-        if (selected_sign_name == "Select element to sign" or
-                selected_append_name == "Select element to append signature"):
+        if selected_sign_name == "Select element to sign" or selected_append_name == "Select element to append signature":
             QMessageBox.warning(
                 self, "Warning",
                 "Please select elements to sign and append the signature."
@@ -559,8 +521,7 @@ class SoapTester(QMainWindow):
         selected_sign_name = self.element_sign_combo.currentText()
         selected_append_name = self.element_append_combo.currentText()
 
-        if (selected_sign_name == "Select element to sign" or
-                selected_append_name == "Select element to append signature"):
+        if selected_sign_name == "Select element to sign" or selected_append_name == "Select element to append signature":
             QMessageBox.warning(
                 self, "Warning",
                 "Please select valid elements for verification."
@@ -592,6 +553,10 @@ class SoapTester(QMainWindow):
             else:
                 signature = base64.b64decode(signature_b64)
                 content = self.canonicalize_element(sign_target)
+                # Remove all whitespace and newlines from content
+                content_str = content.decode('utf-16le')
+                content_str = re.sub(r'\s+', '', content_str)
+                content = content_str.encode('utf-16le')
                 self.verifying_certificate.public_key().verify(
                     signature, content, padding.PKCS1v15(), hashes.SHA256()
                 )
@@ -631,7 +596,6 @@ class SoapTester(QMainWindow):
                             return
 
             operation_name = list(self.client.service._operations.keys())[0]
-            # operation = list(self.client.service._operations.values())[0]
 
             body = root.find('{http://schemas.xmlsoap.org/soap/envelope/}Body')
             if body is None:
@@ -667,7 +631,7 @@ class SoapTester(QMainWindow):
 
     @staticmethod
     def dict_to_xml(data, root_tag):
-        """Convert a dictionary to an XML string.
+        """Convert a dictionary to an XML string, ensuring BillsRec is included.
 
         Args:
             data: The dictionary to convert.
@@ -676,9 +640,34 @@ class SoapTester(QMainWindow):
         Returns:
             str: The XML string representation.
         """
+        def is_empty_leaf(value):
+            """Check if a value is an empty leaf (None, empty dict, empty list, empty string)."""
+            if value is None:
+                return True
+            if isinstance(value, dict):
+                return len(value) == 0
+            if isinstance(value, list):
+                return len(value) == 0
+            if isinstance(value, str):
+                return value.strip() == ''
+            return False
+
         root = ET.Element(root_tag)
 
         def build_element(parent, key, value):
+            if key == 'MsgBody':
+                elem = ET.SubElement(parent, key)
+                # Process MsgBody children
+                for k, v in value.items():
+                    build_element(elem, k, v)
+                # Ensure BillsRec is included, even if absent or empty
+                if 'BillsRec' not in value:
+                    ET.SubElement(elem, 'BillsRec')
+                return
+            if is_empty_leaf(value) and isinstance(value, dict):
+                # Create an empty tag for empty dictionaries
+                ET.SubElement(parent, key)
+                return
             if isinstance(value, dict):
                 elem = ET.SubElement(parent, key)
                 for k, v in value.items():
