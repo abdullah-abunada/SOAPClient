@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 )
 from xml.dom import minidom
 import xml.etree.ElementTree as ET
+from xml_highlighter import XmlHighlighter
 import zeep
 from zeep.transports import Transport
 
@@ -94,8 +95,10 @@ class SoapTester(QMainWindow):
         editor_layout = QHBoxLayout()
         self.request_edit = QTextEdit()
         self.request_edit.setPlaceholderText("XML Request will appear here")
+        self.request_highlighter = XmlHighlighter(self.request_edit.document())
         self.response_edit = QTextEdit()
         self.response_edit.setPlaceholderText("XML Response will appear here")
+        self.response_highlighter = XmlHighlighter(self.response_edit.document())
         self.response_edit.setReadOnly(True)
         editor_layout.addWidget(self.request_edit)
         editor_layout.addWidget(self.response_edit)
@@ -290,7 +293,7 @@ class SoapTester(QMainWindow):
 
     @staticmethod
     def format_xml(xml_string):
-        """Format XML string for display with proper indentation.
+        """Format XML string for display with proper indentation and remove the last empty tag.
 
         Args:
             xml_string: The raw XML string to format.
@@ -299,14 +302,79 @@ class SoapTester(QMainWindow):
             str: The formatted XML string.
         """
         try:
+            # Initial formatting with minidom
             parsed = minidom.parseString(xml_string)
-            pretty_xml = parsed.toprettyxml(indent="  ")
-            cleaned_xml = re.sub(r'\n\s*\n+', '\n', pretty_xml)
+            pretty_xml_string = parsed.toprettyxml(indent="  ")
+            # Apply initial regex cleanups (consistent with original behavior)
+            cleaned_xml = re.sub(r'\n\s*\n+', '\n', pretty_xml_string)
             cleaned_xml = '\n'.join(line.rstrip() for line in cleaned_xml.splitlines() if line.strip())
-            cleaned_xml = re.sub(r'<([a-zA-Z0-9_:.-]+)([^>]*)\s*/>', r'<\1\2></\1>', cleaned_xml)
-            return cleaned_xml
-        except Exception:
+            # The original version had a regex to convert <tag/> to <tag></tag>.
+            # This might be important for the "empty" check later if minidom produces self-closing tags.
+            # However, ET.fromstring might handle self-closing tags fine.
+            # For now, let's keep it to ensure the input to ET is consistent with previous expectations.
+            # cleaned_xml = re.sub(r'<([a-zA-Z0-9_:.-]+)([^>]*)\s*/>', r'<\1\2></\1>', cleaned_xml)
+
+        except Exception as e:
+            # If minidom parsing fails, return original string as a fallback
+            print(f"Error in initial minidom parsing: {e}")
             return xml_string
+
+        try:
+            # Parse into ElementTree for structural modification
+            # Remove XML declaration if present, as ET.fromstring doesn't like it.
+            cleaned_xml_for_et_no_decl = re.sub(r'^<\?xml.*?\?>', '', cleaned_xml, flags=re.DOTALL).strip()
+            
+            parser = ET.XMLParser(strip_cdata=False) # Do not recover, let it fail on bad XML
+            root = ET.fromstring(cleaned_xml_for_et_no_decl.encode('utf-8'), parser=parser)
+
+            parent_map = {c: p for p in root.iter() for c in p}
+            candidate_to_remove = None
+
+            # Iterate through all elements in document order (which is depth-first)
+            for element in root.iter():
+                # Check if element is "empty": no children and no significant text
+                is_empty = (len(list(element)) == 0 and
+                              (element.text is None or not element.text.strip()))
+                if is_empty:
+                    # This element is empty. Since we iterate in document order,
+                    # the last one assigned to candidate_to_remove will be the "last" empty tag.
+                    candidate_to_remove = element
+
+            # If an empty tag was found and it's not the root element, remove it
+            if candidate_to_remove is not None and candidate_to_remove is not root:
+                parent = parent_map.get(candidate_to_remove)
+                if parent is not None:
+                    parent.remove(candidate_to_remove)
+            
+            # Serialize back to string using 'unicode' to get a string directly
+            modified_xml_string = ET.tostring(root, encoding='unicode', method='xml')
+
+            # Re-format with minidom for consistent pretty output
+            final_parsed = minidom.parseString(modified_xml_string)
+            final_pretty_xml = final_parsed.toprettyxml(indent="  ")
+            
+            # Apply the same newline cleaning as before
+            cleaned_final_xml = re.sub(r'\n\s*\n+', '\n', final_pretty_xml)
+            cleaned_final_xml = '\n'.join(line.rstrip() for line in cleaned_final_xml.splitlines() if line.strip())
+            
+            # The original code had a regex to convert <tag ... /> to <tag ...></tag>.
+            # minidom.toprettyxml might already handle this or produce <tag/> for elements without children.
+            # If an element was specifically made empty by removing its child, ET.tostring and then
+            # minidom should correctly represent it as <tag></tag> or <tag/>.
+            # Let's omit the forceful expansion of self-closing tags here unless testing shows it's necessary
+            # for consistency with other parts of the application or for the definition of "empty".
+            # The primary goal is pretty printing of the (potentially) modified ET structure.
+
+            return cleaned_final_xml
+
+        except ET.ParseError as e:
+            print(f"Error parsing XML with ElementTree for empty tag removal: {e}")
+            # Fallback to the minidom-prettified version if ET processing fails
+            return cleaned_xml 
+        except Exception as e:
+            print(f"Generic error during XML processing for empty tag removal: {e}")
+            # Fallback to the minidom-prettified version as a last resort
+            return cleaned_xml
 
     def populate_element_combos(self):
         """Populate dropdown menus with XML element names from the WSDL."""
