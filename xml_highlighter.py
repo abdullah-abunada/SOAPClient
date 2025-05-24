@@ -2,6 +2,7 @@ import re
 from PyQt6.QtGui import QSyntaxHighlighter, QColor, QTextCharFormat, QFont, QPalette
 from PyQt6.QtWidgets import QApplication  # To get the global application palette
 
+
 class XmlHighlighter(QSyntaxHighlighter):
 
     def __init__(self, parent=None):
@@ -11,7 +12,7 @@ class XmlHighlighter(QSyntaxHighlighter):
         # Ensure QApplication instance exists, especially if highlighter can be created before app exec.
         app_instance = QApplication.instance()
         if app_instance is None:  # Fallback if no app instance (e.g. testing outside app)
-            is_dark_mode = False 
+            is_dark_mode = False
         else:
             current_palette = app_instance.palette()
             is_dark_mode = current_palette.color(QPalette.ColorRole.Base).lightnessF() < 0.5
@@ -132,8 +133,8 @@ class XmlHighlighter(QSyntaxHighlighter):
                         length = match.end(0) - start
                         self.setFormat(start, length, char_format)
                     elif pattern.pattern == r"\s*([/?]?)>":
-                         # This rule targets the whole match (closing brackets)
-                         # Or match.start(1) if only the bracket itself, but original was likely whole match
+                        # This rule targets the whole match (closing brackets)
+                        # Or match.start(1) if only the bracket itself, but original was likely whole match
                         start = match.start(0)
                         length = match.end(0) - start
                         self.setFormat(start, length, char_format)
